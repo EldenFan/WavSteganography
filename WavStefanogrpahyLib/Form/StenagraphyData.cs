@@ -1,5 +1,5 @@
 ﻿using System.Text;
-using WavStefanogrpahyLib.Base;
+using WavSteganographyLib.Utils;
 
 namespace WavSteganographyLib.Form
 {
@@ -15,11 +15,13 @@ namespace WavSteganographyLib.Form
 
         #region Constructor
 
-        public StenagraphyData(string dataToHide, MethodsType steganographyType)
+        public StenagraphyData(string dataToHide)
         {
             data = Encoding.UTF8.GetBytes(dataToHide);
 
-            header = new Header((uint)data.Length, steganographyType);
+            var crc = Crc32.Compute(data);
+
+            header = new Header((uint)data.Length, crc);
         }
 
         private StenagraphyData(Header header, byte[] data)
@@ -46,6 +48,12 @@ namespace WavSteganographyLib.Form
             var data = new byte[header.DataSize];
 
             Array.Copy(bytes, Header.SIZE, data, 0, header.DataSize);
+
+            var actualCrc = Crc32.Compute(data);
+            if (actualCrc != header.Crc)
+            {
+                throw new InvalidDataException("Контрольная сумма CRC не совпадает: извлечённые данные повреждены");
+            }
 
             return new StenagraphyData(header, data);
         }

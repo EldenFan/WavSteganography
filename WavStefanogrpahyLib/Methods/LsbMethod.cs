@@ -1,6 +1,7 @@
 ﻿using WavStefanogrpahyLib.Base;
 using WavSteganographyLib.Form;
 using WavSteganographyLib.Interface;
+using WavSteganographyLib.Utils;
 
 namespace WavSteganographyLib.Methods
 {
@@ -10,24 +11,18 @@ namespace WavSteganographyLib.Methods
 
         public short[] Embed(short[] samples, StenagraphyData data)
         {
-            var bytes = data.ToBytes();
-
-            if (bytes.Length * 8 > samples.Length)
+            if (data.Size * 8 > samples.Length)
             {
                 throw new ArgumentException("Длина файла меньше, чем информация для стеганографии");
             }
 
             var result = (short[])samples.Clone();
 
-            var samplesIndex = 0;
-            foreach (var byteData in bytes)
+            var bits = BitUtils.ToBits(data.ToBytes());
+            
+            for (int i = 0; i < bits.Length; i++)
             {
-                for (var j = 7;  j >= 0; j--)
-                {
-                    var bit = (byteData >> j) & 1;
-                    result[samplesIndex] = (short)((result[samplesIndex] & ~1) | bit);
-                    samplesIndex++;
-                }
+                result[i] = (short)((result[i] & ~1) | (bits[i] ? 1 : 0));
             }
 
             return result;
@@ -35,42 +30,33 @@ namespace WavSteganographyLib.Methods
 
         public StenagraphyData Extract(short[] samples)
         {
-            var headerBytes = ExtractBytes(samples, 0, Header.SIZE);
-            var header = Header.FromBytes(headerBytes);
-            var dataBytes = ExtractBytes(samples, Header.SIZE * 8, (int)header.DataSize);
+            var headerBits = ExtractBits(samples, 0, Header.SIZE * 8);
+            var header = Header.FromBytes(BitUtils.ToBytes(headerBits));
+            var dataBytes = BitUtils.ToBytes(ExtractBits(samples, Header.SIZE * 8, (int)header.DataSize * 8));
             var allBytes = new byte[Header.SIZE + header.DataSize];
 
-            Array.Copy(headerBytes, 0, allBytes, 0, Header.SIZE);
+            Array.Copy(header.ToBytes(), 0, allBytes, 0, Header.SIZE);
             
             Array.Copy(dataBytes, 0, allBytes, Header.SIZE, dataBytes.Length);
 
             return StenagraphyData.FromBytes(allBytes);
         }
 
-        private static byte[] ExtractBytes(short[] samples, int sampleOffset, int byteCount)
+        private static bool[] ExtractBits(short[] samples, int sampleOffset, int bitsCount)
         {
-            if (sampleOffset + byteCount * 8 > samples.Length)
+            if (sampleOffset + bitsCount > samples.Length)
             {
                 throw new ArgumentException("В аудиоданных недостаточно информации");
             }
 
-            var result = new byte[byteCount];
+            var bits = new bool[bitsCount];
 
-            for (var i = 0; i < byteCount; i++)
+            for (var i = 0; i < bitsCount; i++)
             {
-                byte value = 0;
-
-                for (var bitIndex = 7; bitIndex >= 0; bitIndex--)
-                {
-                    var bit = samples[sampleOffset++] & 1;
-
-                    value |= (byte)(bit << bitIndex);
-                }
-
-                result[i] = value;
+                bits[i] = (samples[sampleOffset + i] & 1) == 1;
             }
 
-            return result;
+            return bits;
         }
     }
 }

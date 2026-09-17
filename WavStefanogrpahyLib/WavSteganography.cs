@@ -13,7 +13,7 @@ namespace WavSteganographyLib
 
             var steganographyMethod = MethodFactory.Create(method);
 
-            var steganographyData = new StenagraphyData(data, steganographyMethod.Type);
+            var steganographyData = new StenagraphyData(data);
 
             var samples = steganographyMethod.Embed(wav.Samples, steganographyData);
 
