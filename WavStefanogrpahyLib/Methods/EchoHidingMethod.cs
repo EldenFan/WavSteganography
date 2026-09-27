@@ -29,9 +29,6 @@ namespace WavSteganographyLib.Methods
             var bytes = data.ToBytes();
             var rawBits = BitUtils.ToBits(bytes);
 
-            // Вместо REPEAT_COUNT физических копий каждого бита в разных
-            // блоках добавляем избыточность на уровне самого битового потока:
-            // Хэмминг(7,4) способен исправить 1 ошибочный бит на каждые 7.
             var encodedBits = HammingCode.Encode(rawBits);
 
             var blockCount = samples.Length / BLOCKSIZE;
@@ -105,14 +102,11 @@ namespace WavSteganographyLib.Methods
             return window;
         }
 
-        // blockStartIndex/blockCount теперь напрямую соответствуют номерам
-        // блоков аудио — каждый закодированный (Хэммингом) бит лежит ровно
-        // в одном блоке, без повторов.
         private static bool[] ExtractBits(short[] samples, int blockStartIndex, int blockCount)
         {
             if (blockCount <= 0)
             {
-                return Array.Empty<bool>();
+                return [];
             }
 
             var totalBlocks = samples.Length / BLOCKSIZE;
