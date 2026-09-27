@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace WavStefanogrpahyLib.Utils
+namespace WavSteganographyLib.Utils
 {
     public static class FFT
     {

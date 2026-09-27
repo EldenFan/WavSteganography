@@ -1,4 +1,4 @@
-﻿using WavStefanogrpahyLib.Base;
+﻿using WavSteganographyLib.Base;
 using WavSteganographyLib.Form;
 
 namespace WavSteganographyLib.Interface

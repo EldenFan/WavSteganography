@@ -1,6 +1,4 @@
-﻿using WavStefanogrpahyLib.Base;
-
-namespace WavSteganographyLib.Form
+﻿namespace WavSteganographyLib.Form
 {
     public class Header(uint size, uint crc)
     {

@@ -10,6 +10,7 @@ namespace WavSteganographyLib.Factory
             return type.ToLower() switch
             {
                 "lsb" => new LsbMethod(),
+                "echo" => new EchoHidingMethod(),
                 _ => throw new Exception($"Неизвестный метод: {type}")
             };
         }

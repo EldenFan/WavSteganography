@@ -1,4 +1,4 @@
-﻿namespace WavStefanogrpahyLib.Base
+﻿namespace WavSteganographyLib.Base
 {
     public enum MethodsType : byte
     {

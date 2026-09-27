@@ -1,6 +1,7 @@
-﻿using WavStefanogrpahyLib.Base;
+﻿using WavSteganographyLib.Base;
 using WavSteganographyLib.Form;
 using WavSteganographyLib.Interface;
+using WavSteganographyLib.Properties;
 using WavSteganographyLib.Utils;
 
 namespace WavSteganographyLib.Methods
@@ -13,7 +14,7 @@ namespace WavSteganographyLib.Methods
         {
             if (data.Size * 8 > samples.Length)
             {
-                throw new ArgumentException("Длина файла меньше, чем информация для стеганографии");
+                throw new ArgumentException(Resources.Exception_DataBiggerSamples);
             }
 
             var result = (short[])samples.Clone();
@@ -46,7 +47,7 @@ namespace WavSteganographyLib.Methods
         {
             if (sampleOffset + bitsCount > samples.Length)
             {
-                throw new ArgumentException("В аудиоданных недостаточно информации");
+                throw new ArgumentException(Resources.Expection_SamplesSmallerExpectionData);
             }
 
             var bits = new bool[bitsCount];
