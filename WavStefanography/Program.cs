@@ -1,5 +1,8 @@
-﻿using WavSteganographyConsole.Base;
+﻿using System.Globalization;
+using WavSteganographyConsole.Base;
 using WavSteganographyLib;
+using WavSteganographyLib.Base;
+using WavSteganographyLib.Utils;
 
 namespace WavSteganographyConsole
 {
@@ -28,6 +31,10 @@ namespace WavSteganographyConsole
 
                     case WorkTypes.Extract:
                         Extract(args);
+                        break;
+
+                    case WorkTypes.Generate:
+                        Generate(args);
                         break;
 
                     default:
@@ -78,6 +85,57 @@ namespace WavSteganographyConsole
             var result = WavSteganography.Extract(inputFile, methodName);
 
             Console.WriteLine($"Result: {result}");
+        }
+
+        private static void Generate(string[] args)
+        {
+            if (args.Length < 2 || args.Length > 3)
+            {
+                Console.WriteLine("Использование: generate <output.wav> [seconds]");
+                return;
+            }
+
+            var outputFile = args[1];
+            var seconds = args.Length == 3 ? double.Parse(args[2], CultureInfo.InvariantCulture)  : 60.0;
+
+            const int sampleRate = 44100;
+            const int bitsPerSample = 16;
+            const ushort channels = 1;
+
+            var sampleCount = (int)(seconds * sampleRate);
+
+            var samples = GenerateTestSignal(sampleCount);
+
+            var wav = new WavData
+            {
+                AudioFormat = 1,
+                Channels = channels,
+                SampleRate = sampleRate,
+                BitsPerSample = bitsPerSample,
+                BlockAlign = (ushort)(channels * bitsPerSample / 8),
+                ByteRate = (uint)(sampleRate * channels * bitsPerSample / 8),
+                Samples = samples,
+            };
+
+            WavFile.WriteWavFile(outputFile, wav);
+
+            Console.WriteLine($"Сгенерирован чистый тестовый сигнал: {outputFile}");
+            Console.WriteLine($"Длительность: {seconds:F1} с, сэмплов: {sampleCount}, блоков (2048): {sampleCount / 2048}");
+        }
+
+        private static short[] GenerateTestSignal(int length, int seed = 42, double amplitude = 3000)
+        {
+            var rnd = new Random(seed);
+            var samples = new short[length];
+
+            for (var n = 0; n < length; n++)
+            {
+                var value = amplitude * Math.Sin(2 * Math.PI * 440 * n / 44100.0) + amplitude * 0.5 * Math.Sin(2 * Math.PI * 1000 * n / 44100.0) + (rnd.NextDouble() - 0.5) * 200;
+
+                samples[n] = (short)Math.Clamp(value, short.MinValue, short.MaxValue);
+            }
+
+            return samples;
         }
     }
 }

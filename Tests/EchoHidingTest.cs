@@ -1,6 +1,6 @@
 using System.Text;
 using WavSteganographyLib.Form;
-using WavSteganographyLib.Methods;
+using WavSteganographyLib.Methods.EchoHiding;
 
 namespace Tests
 {
