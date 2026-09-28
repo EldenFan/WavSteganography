@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WavStefanogrpahyLib\WavSteganographyLib.csproj" />
+    <ProjectReference Include="..\WavSteganogrpahyLib\WavSteganographyLib.csproj" />
   </ItemGroup>
 
   <ItemGroup>

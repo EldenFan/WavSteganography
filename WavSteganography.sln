@@ -3,12 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.37314.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WavSteganographyConsole", "WavStefanography\WavSteganographyConsole.csproj", "{CB03A9E7-8563-4571-AF62-3026B44C6984}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WavSteganographyConsole", "WavSteganography\WavSteganographyConsole.csproj", "{CB03A9E7-8563-4571-AF62-3026B44C6984}"
 	ProjectSection(ProjectDependencies) = postProject
 		{F88E68D8-28C5-4D07-9BA9-6D03074F9401} = {F88E68D8-28C5-4D07-9BA9-6D03074F9401}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WavSteganographyLib", "WavStefanogrpahyLib\WavSteganographyLib.csproj", "{F88E68D8-28C5-4D07-9BA9-6D03074F9401}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WavSteganographyLib", "WavSteganogrpahyLib\WavSteganographyLib.csproj", "{F88E68D8-28C5-4D07-9BA9-6D03074F9401}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{68365BBB-C631-41A9-AC5F-83380A163B7B}"
 EndProject
