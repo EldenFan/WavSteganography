@@ -59,5 +59,10 @@ namespace WavSteganographyLib.Methods
 
             return bits;
         }
+
+        public BerResult MeasureBer(short[] samples, StenagraphyData expected)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

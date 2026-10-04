@@ -32,5 +32,14 @@ namespace WavSteganographyLib
 
             return Encoding.UTF8.GetString(steganographyData.Data);
         }
+
+        public static BerResult MeasureBer(string inputFile, string method, string expectedData)
+        {
+            var wav = WavFile.ReadWavFile(inputFile);
+
+            var steganographyMethod = MethodFactory.Create(method);
+
+            return steganographyMethod.MeasureBer(wav.Samples, new StenagraphyData(expectedData));
+        }
     }
 }

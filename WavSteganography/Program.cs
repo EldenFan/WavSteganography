@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Numerics;
 using WavSteganographyConsole.Base;
 using WavSteganographyLib;
 using WavSteganographyLib.Base;
@@ -35,6 +36,14 @@ namespace WavSteganographyConsole
 
                     case WorkTypes.Generate:
                         Generate(args);
+                        break;
+
+                    case WorkTypes.Compare:
+                        Compare(args); 
+                        break;
+
+                    case WorkTypes.Ber:
+                        Ber(args);
                         break;
 
                     default:
@@ -136,6 +145,121 @@ namespace WavSteganographyConsole
             }
 
             return samples;
+        }
+
+        private static void Compare(string[] args)
+        {
+            if (args.Length != 3)
+            {
+                Console.WriteLine("Использование: compare <original.wav> <other.wav>");
+                return;
+            }
+
+            var original = WavFile.ReadWavFile(args[1]);
+            var other = WavFile.ReadWavFile(args[2]);
+
+            var n = Math.Min(original.Samples.Length, other.Samples.Length);
+
+            if (n == 0)
+            {
+                Console.WriteLine("Ошибка: один из файлов пуст.");
+                return;
+            }
+
+            double signalEnergy = 0;
+            double noiseEnergy = 0;
+
+            for (var i = 0; i < n; i++)
+            {
+                var s = (double)original.Samples[i];
+                var d = (double)other.Samples[i] - s;
+
+                signalEnergy += s * s;
+                noiseEnergy += d * d;
+            }
+
+            var snr = noiseEnergy > 1e-9
+                ? 10.0 * Math.Log10(signalEnergy / noiseEnergy)
+                : double.PositiveInfinity;
+
+            var lsd = ComputeLogSpectralDistance(original.Samples, other.Samples, n);
+
+            Console.WriteLine($"Compared samples: {n}");
+            Console.WriteLine($"SNR: {snr:F2} dB");
+            Console.WriteLine($"LSD: {lsd:F3} dB");
+        }
+
+        private static void Ber(string[] args)
+        {
+            if (args.Length != 4)
+            {
+                Console.WriteLine("Использование: ber <stego.wav> <method> <expected data>");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            var result = WavSteganography.MeasureBer(args[1], args[2], args[3]);
+
+            Console.WriteLine($"Info bits: {result.InfoBits}, errors: {result.InfoErrors}");
+            Console.WriteLine($"Block decisions: {result.RawBits}, errors: {result.RawErrors}");
+            Console.WriteLine($"BER: {result.Ber:F6}");
+            Console.WriteLine($"BER_RAW: {result.RawBer:F6}");
+        }
+
+        private const int CompareBlockSize = 2048;
+
+        private static double ComputeLogSpectralDistance(short[] a, short[] b, int n)
+        {
+            var blockCount = n / CompareBlockSize;
+
+            if (blockCount == 0)
+            {
+                return 0.0;
+            }
+
+            double totalDistance = 0;
+
+            for (var block = 0; block < blockCount; block++)
+            {
+                var offset = block * CompareBlockSize;
+
+                var specA = ComputeLogSpectrum(a, offset);
+                var specB = ComputeLogSpectrum(b, offset);
+
+                double sumSq = 0;
+
+                for (var k = 0; k < specA.Length; k++)
+                {
+                    var diff = specA[k] - specB[k];
+                    sumSq += diff * diff;
+                }
+
+                totalDistance += Math.Sqrt(sumSq / specA.Length);
+            }
+
+            return totalDistance / blockCount;
+        }
+
+        private static double[] ComputeLogSpectrum(short[] samples, int offset)
+        {
+            var spectrum = new Complex[CompareBlockSize];
+
+            for (var n = 0; n < CompareBlockSize; n++)
+            {
+                spectrum[n] = new Complex(samples[offset + n], 0);
+            }
+
+            var freq = FFT.Forward(spectrum);
+
+            var half = CompareBlockSize / 2;
+            var logMagnitude = new double[half];
+
+            for (var k = 0; k < half; k++)
+            {
+                logMagnitude[k] = 20.0 * Math.Log10(freq[k].Magnitude + 1e-6);
+            }
+
+            return logMagnitude;
         }
     }
 }

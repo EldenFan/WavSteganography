@@ -6,7 +6,7 @@ using WavSteganographyLib.Properties;
 using WavSteganographyLib.Utils;
 
 namespace WavSteganographyLib.Methods.EchoHiding
-{ 
+{
     public class EchoHidingMethod(EchoHidingVariant variant = EchoHidingVariant.Hamming) : IMethod
     {
         private const int BLOCKSIZE = 2048;
@@ -32,9 +32,7 @@ namespace WavSteganographyLib.Methods.EchoHiding
 
         private bool UseEcc => variant == EchoHidingVariant.Hamming;
 
-        private int RepeatCount => variant is EchoHidingVariant.Repeat or EchoHidingVariant.RepeatSpread
-            ? REPEAT_COUNT
-            : 1;
+        private int RepeatCount => variant is EchoHidingVariant.Repeat or EchoHidingVariant.RepeatSpread ? REPEAT_COUNT : 1;
 
         public short[] Embed(short[] samples, StenagraphyData data)
         {
@@ -89,6 +87,85 @@ namespace WavSteganographyLib.Methods.EchoHiding
             return StenagraphyData.FromBytes(BitUtils.ToBytes(allBits));
         }
 
+        public BerResult MeasureBer(short[] samples, StenagraphyData expected)
+        {
+            var rawBits = BitUtils.ToBits(expected.ToBytes());
+
+            var headerRawBitCount = Header.SIZE * 8;
+            var dataRawBitCount = rawBits.Length - headerRawBitCount;
+
+            var headerCoded = Encode(rawBits, 0, headerRawBitCount);
+            var dataCoded = Encode(rawBits, headerRawBitCount, dataRawBitCount);
+
+            var expectedCoded = new bool[headerCoded.Length + dataCoded.Length];
+
+            Array.Copy(headerCoded, expectedCoded, headerCoded.Length);
+            Array.Copy(dataCoded, 0, expectedCoded, headerCoded.Length, dataCoded.Length);
+
+            var blockCount = samples.Length / BLOCKSIZE;
+            var stride = blockCount / REPEAT_COUNT;
+            var repeatCount = RepeatCount;
+
+            var lastLogicalIndex = expectedCoded.Length - 1;
+            var maxBlockIndex = GetBlockIndex(lastLogicalIndex, repeatCount - 1, stride);
+
+            if (maxBlockIndex >= blockCount || variant == EchoHidingVariant.RepeatSpread && stride <= lastLogicalIndex)
+            {
+                throw new ArgumentException(Resources.Expection_SamplesSmallerExpectionData);
+            }
+
+            var voted = new bool[expectedCoded.Length];
+            var rawErrors = 0;
+            var rawTotal = 0;
+
+            for (var i = 0; i < expectedCoded.Length; i++)
+            {
+                var trueCount = 0;
+
+                for (var repeat = 0; repeat < repeatCount; repeat++)
+                {
+                    var detected = ExtractBitFromBlock(samples, GetBlockIndex(i, repeat, stride));
+
+                    if (detected)
+                    {
+                        trueCount++;
+                    }
+
+                    if (detected != expectedCoded[i])
+                    {
+                        rawErrors++;
+                    }
+
+                    rawTotal++;
+                }
+
+                voted[i] = trueCount * 2 > repeatCount;
+            }
+
+            var headerBits = Decode(voted[..headerCoded.Length], headerRawBitCount);
+            var dataBits = Decode(voted[headerCoded.Length..], dataRawBitCount);
+
+            var infoErrors = 0;
+
+            for (var i = 0; i < headerBits.Length; i++)
+            {
+                if (headerBits[i] != rawBits[i])
+                {
+                    infoErrors++;
+                }
+            }
+
+            for (var i = 0; i < dataBits.Length; i++)
+            {
+                if (dataBits[i] != rawBits[headerRawBitCount + i])
+                {
+                    infoErrors++;
+                }
+            }
+
+            return new BerResult(rawBits.Length, infoErrors, rawTotal, rawErrors);
+        }
+
         private bool[] Encode(bool[] allRawBits, int offset, int count)
         {
             var slice = new bool[count];
@@ -125,18 +202,14 @@ namespace WavSteganographyLib.Methods.EchoHiding
             };
         }
 
-        // logicalIndex — сквозной номер бита (заголовок 0..63/111, затем данные дальше).
         private int GetBlockIndex(int logicalIndex, int repeat, int stride)
         {
             return variant switch
             {
-                // Повторы подряд: bitIndex*REPEAT_COUNT + repeat
                 EchoHidingVariant.Repeat => logicalIndex * REPEAT_COUNT + repeat,
 
-                // Повторы разнесены по полосам файла: repeat*stride + bitIndex
                 EchoHidingVariant.RepeatSpread => repeat * stride + logicalIndex,
 
-                // Naive / Windowed / Hamming: ровно один блок на бит
                 _ => logicalIndex,
             };
         }

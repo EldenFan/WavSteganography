@@ -4,6 +4,8 @@
     {
         Embed,
         Extract,
-         Generate
+        Generate,
+        Compare,
+        Ber
     }
 }

@@ -10,5 +10,7 @@ namespace WavSteganographyLib.Interface
         short[] Embed(short[] samples, StenagraphyData data);
 
         StenagraphyData Extract(short[] samples);
+
+        BerResult MeasureBer(short[] samples, StenagraphyData expected);
     }
 }
