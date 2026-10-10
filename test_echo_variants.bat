@@ -2,17 +2,50 @@
 setlocal EnableDelayedExpansion
 chcp 65001 >nul
 
-if "%~1"=="" goto usage
+set "SECONDS=60"
+set "TEXT_COUNT=0"
 
-set "TEXT=%~1"
+:parseArgs
+if "%~1"=="" goto argsDone
+if /i "%~1"=="-s" goto argSeconds
+if /i "%~1"=="-f" goto argFile
+set /a TEXT_COUNT+=1
+set "TEXT_!TEXT_COUNT!=%~1"
+shift
+goto parseArgs
+
+:argSeconds
+if "%~2"=="" goto usage
 set "SECONDS=%~2"
-if "%SECONDS%"=="" set "SECONDS=60"
+shift
+shift
+goto parseArgs
+
+:argFile
+if "%~2"=="" goto usage
+if not exist "%~2" (
+    echo Файл со строками не найден: %~2
+    exit /b 1
+)
+for /f "usebackq eol=# delims=" %%L in ("%~2") do (
+    set /a TEXT_COUNT+=1
+    set "TEXT_!TEXT_COUNT!=%%L"
+)
+shift
+shift
+goto parseArgs
+
+:argsDone
+if "%TEXT_COUNT%"=="0" goto usage
 
 set "PROJECT_DIR=WavSteganography"
 set "EXE=%PROJECT_DIR%\bin\Debug\net8.0\WavSteganographyConsole.exe"
 set "WORK_DIR=Analys\echo_test_run"
 set "TEST_AUDIO_DIR=TestAudio"
+set "SRC_DIR=%WORK_DIR%\_sources"
 set "CSV=%WORK_DIR%\results.csv"
+set "TEXTS_CSV=%WORK_DIR%\texts.csv"
+set "SUMMARY_PS=%~dp0summarize_echo_results.ps1"
 
 set "ESC="
 set "COL_GREEN=%ESC%[32m"
@@ -49,26 +82,30 @@ if "%FFMPEG_OK%"=="0" (
 if exist "%WORK_DIR%" rmdir /s /q "%WORK_DIR%"
 mkdir "%WORK_DIR%"
 
->"%CSV%" echo source,method,test,match,ber,ber_raw,snr_db,lsd_db
+>"%CSV%" echo text_id,source,method,test,match,ber,ber_raw,snr_db,lsd_db
+>"%TEXTS_CSV%" echo text_id,text
+for /l %%I in (1,1,%TEXT_COUNT%) do >>"%TEXTS_CSV%" echo %%I,"!TEXT_%%I!"
 
 echo.
-echo Текст: %TEXT%
+echo Строк для теста: %TEXT_COUNT%
+for /l %%I in (1,1,%TEXT_COUNT%) do echo   [%%I] !TEXT_%%I!
 echo.
 echo BER     - доля ошибочных информационных бит ^(заголовок + данные^) после декодирования.
 echo BER_RAW - доля ошибочных решений детектора по отдельным блокам ^(до голосования и Хэмминга^).
-echo Реальные файлы перед тестом приводятся к моно, 44100 Гц, 16 бит ^(source_mono.wav в папке источника^).
+echo Реальные файлы перед тестом приводятся к моно, 44100 Гц, 16 бит ^(source_mono.wav в %SRC_DIR%^).
 
-set "CUR_NAME=clean"
-set "CUR_WORK_DIR=%WORK_DIR%\%CUR_NAME%"
-mkdir "%CUR_WORK_DIR%"
+rem --- Подготовка источников (один раз для всех строк) ---
+set "SRC_COUNT=0"
+mkdir "%SRC_DIR%"
 
 echo.
 echo === Генерация чистого тестового сигнала ^(%SECONDS% сек^) ===
-"%EXE%" generate "%CUR_WORK_DIR%\clean.wav" %SECONDS% >"%CUR_WORK_DIR%\generate.log" 2>&1
+mkdir "%SRC_DIR%\clean"
+"%EXE%" generate "%SRC_DIR%\clean\clean.wav" %SECONDS% >"%SRC_DIR%\clean\generate.log" 2>&1
 if errorlevel 1 (
-    echo Не удалось сгенерировать сигнал, смотрите %CUR_WORK_DIR%\generate.log
+    echo Не удалось сгенерировать сигнал, смотрите %SRC_DIR%\clean\generate.log
 ) else (
-    call :runAllVariants "%CUR_WORK_DIR%\clean.wav" "CLEAN (синтетика)"
+    call :addSource "%SRC_DIR%\clean\clean.wav" "clean" "CLEAN (синтетика)"
 )
 
 if not exist "%TEST_AUDIO_DIR%" (
@@ -76,27 +113,76 @@ if not exist "%TEST_AUDIO_DIR%" (
     echo Папка "%TEST_AUDIO_DIR%" не найдена — реальные файлы пропущены.
     echo Создайте её рядом со скриптом и положите туда .wav файлы.
 ) else (
+    echo === Подготовка файлов из %TEST_AUDIO_DIR% ===
     for %%F in ("%TEST_AUDIO_DIR%\*.wav") do (
-        set "CUR_NAME=%%~nF"
-        set "CUR_WORK_DIR=%WORK_DIR%\!CUR_NAME!"
-        mkdir "!CUR_WORK_DIR!"
-        call :prepareSource "%%~fF" "!CUR_WORK_DIR!\source_mono.wav"
-        if exist "!CUR_WORK_DIR!\source_mono.wav" call :runAllVariants "!CUR_WORK_DIR!\source_mono.wav" "%%~nxF"
-        if not exist "!CUR_WORK_DIR!\source_mono.wav" echo Не удалось подготовить %%~nxF, смотрите prepare.log в !CUR_WORK_DIR!
+        set "PREP_DIR=%SRC_DIR%\%%~nF"
+        mkdir "!PREP_DIR!"
+        call :prepareSource "%%~fF" "!PREP_DIR!\source_mono.wav"
+        if exist "!PREP_DIR!\source_mono.wav" (
+            call :addSource "!PREP_DIR!\source_mono.wav" "%%~nF" "%%~nxF"
+        ) else (
+            echo Не удалось подготовить %%~nxF, смотрите prepare.log в !PREP_DIR!
+        )
     )
 )
 
+if "%SRC_COUNT%"=="0" (
+    echo Нет ни одного источника для теста.
+    exit /b 1
+)
+
+rem --- Прогон всех строк по всем источникам ---
+for /l %%T in (1,1,%TEXT_COUNT%) do call :runText %%T
+
 echo.
-echo Готово. Результаты — в папке "%WORK_DIR%" (отдельная подпапка на каждый источник).
-echo Сводная таблица для обработки: %CSV%
+echo Готово. Результаты — в папке "%WORK_DIR%" (подпапка tN на каждую строку, внутри — на каждый источник).
+echo Сводная таблица: %CSV%
+echo Список строк:    %TEXTS_CSV%
+
+if exist "%SUMMARY_PS%" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%SUMMARY_PS%" -CsvPath "%CSV%" -OutDir "%WORK_DIR%"
+) else (
+    echo Не найден %SUMMARY_PS% — средние значения не посчитаны.
+)
 exit /b 0
 
 :usage
-echo Использование: %~nx0 "текст" [seconds_для_CLEAN]
+echo Использование: %~nx0 [-s seconds_для_CLEAN] [-f файл_со_строками] "текст1" ["текст2" ...]
 echo   Тестирует все варианты echo hiding на синтетическом CLEAN-сигнале
-echo   и на каждом .wav файле из папки TestAudio\.
-echo   В тексте избегайте восклицательного знака, процента, каретки и кавычек.
+echo   и на каждом .wav файле из папки TestAudio\ — для каждой переданной строки.
+echo   В конце выводятся средние значения по всем строкам ^(и сохраняются в summary_*.csv^).
+echo   -s N     длительность синтетического сигнала в секундах ^(по умолчанию 60^)
+echo   -f FILE  файл со строками: одна строка на линию, пустые и начинающиеся с # пропускаются
+echo            ^(сохраняйте в UTF-8 без BOM^)
+echo   Строки из -f и из аргументов объединяются.
+echo   В тексте избегайте восклицательного знака, процента, каретки, амперсанда и кавычек.
+echo Примеры:
+echo   %~nx0 "Hello World" "Привет мир" "1234567890"
+echo   %~nx0 -s 30 -f texts.txt
 exit /b 1
+
+:addSource
+set /a SRC_COUNT+=1
+set "SRC_PATH_%SRC_COUNT%=%~1"
+set "SRC_NAME_%SRC_COUNT%=%~2"
+set "SRC_DISPLAY_%SRC_COUNT%=%~3"
+exit /b 0
+
+:runText
+set "TEXT_ID=%~1"
+set "TEXT=!TEXT_%~1!"
+
+echo.
+echo ################################################################################
+echo   Строка %TEXT_ID% из %TEXT_COUNT%: !TEXT!
+echo ################################################################################
+
+for /l %%S in (1,1,%SRC_COUNT%) do (
+    set "CUR_WORK_DIR=%WORK_DIR%\t%TEXT_ID%\!SRC_NAME_%%S!"
+    mkdir "!CUR_WORK_DIR!"
+    call :runAllVariants "!SRC_PATH_%%S!" "!SRC_DISPLAY_%%S!"
+)
+exit /b 0
 
 :prepareSource
 rem Метод рассчитан на один канал: приводим файл к моно, 44100 Гц, 16 бит.
@@ -332,7 +418,7 @@ call :writeCsv "%PM%" "%PPROFILE%" "%P_MATCH%" "%P_BER%" "%P_BERRAW%" "-" "-"
 exit /b 0
 
 :writeCsv
-rem %1=метод %2=тест %3=match(ДА/НЕТ/-) %4=ber %5=ber_raw %6=snr %7=lsd
+rem строка: TEXT_ID; %1=метод %2=тест %3=match(ДА/НЕТ/-) %4=ber %5=ber_raw %6=snr %7=lsd
 setlocal EnableDelayedExpansion
 set "c_match=0"
 if "%~3"=="ДА" set "c_match=1"
@@ -345,7 +431,7 @@ if "!c_ber!"=="-" set "c_ber="
 if "!c_raw!"=="-" set "c_raw="
 if "!c_snr!"=="-" set "c_snr="
 if "!c_lsd!"=="-" set "c_lsd="
->>"%CSV%" echo "%DISPLAY_NAME%",%~1,%~2,!c_match!,!c_ber!,!c_raw!,!c_snr!,!c_lsd!
+>>"%CSV%" echo %TEXT_ID%,"%DISPLAY_NAME%",%~1,%~2,!c_match!,!c_ber!,!c_raw!,!c_snr!,!c_lsd!
 endlocal
 exit /b 0
 

@@ -11,6 +11,8 @@ namespace WavSteganographyConsole
     {
         static void Main(string[] args)
         {
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+
             if (args.Length == 0)
             {
                 return;

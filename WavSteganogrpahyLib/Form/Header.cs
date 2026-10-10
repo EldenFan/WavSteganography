@@ -1,22 +1,22 @@
 ﻿namespace WavSteganographyLib.Form
 {
-    public class Header(uint size, uint crc)
+    public class Header(ushort size, ushort crc)
     {
         #region Fields
 
-        public const int SIZE = 8;
+        public const int SIZE = 4;
 
-        private readonly uint dataSize = size;
+        private readonly ushort dataSize = size;
 
-        private readonly uint crc = crc;
+        private readonly ushort crc = crc;
 
         #endregion
 
         #region Public property
 
-        public uint DataSize => dataSize;
+        public ushort DataSize => dataSize;
 
-        public uint Crc => crc;
+        public ushort Crc => crc;
 
         #endregion
 
@@ -24,8 +24,8 @@
 
         public static Header FromBytes(byte[] bytes)
         {
-           var dataSize = BitConverter.ToUInt32(bytes);
-           var crc = BitConverter.ToUInt32(bytes, 4);
+           var dataSize = BitConverter.ToUInt16(bytes);
+           var crc = BitConverter.ToUInt16(bytes, 2);
 
            return new Header(dataSize, crc);
         }
@@ -34,8 +34,8 @@
         {
             var bytes = new byte[SIZE];
 
-            Array.Copy(BitConverter.GetBytes(dataSize), bytes, 4);
-            Array.Copy(BitConverter.GetBytes(crc), 0, bytes, 4, 4);
+            Array.Copy(BitConverter.GetBytes(dataSize), bytes, 2);
+            Array.Copy(BitConverter.GetBytes(crc), 0, bytes, 2, 2);
             
             return bytes;
         }

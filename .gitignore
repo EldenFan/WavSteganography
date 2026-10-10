@@ -430,4 +430,5 @@ FodyWeavers.xsd
 
 
 TestAudio/
-echo_test_run/
+Analys/
+*.docx

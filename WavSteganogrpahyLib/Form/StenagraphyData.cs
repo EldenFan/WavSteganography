@@ -19,9 +19,9 @@ namespace WavSteganographyLib.Form
         {
             data = Encoding.UTF8.GetBytes(dataToHide);
 
-            var crc = Crc32.Compute(data);
+            var crc = Crc16.Compute(data);
 
-            header = new Header((uint)data.Length, crc);
+            header = new Header((ushort)data.Length, crc);
         }
 
         private StenagraphyData(Header header, byte[] data)
@@ -49,7 +49,7 @@ namespace WavSteganographyLib.Form
 
             Array.Copy(bytes, Header.SIZE, data, 0, header.DataSize);
 
-            var actualCrc = Crc32.Compute(data);
+            var actualCrc = Crc16.Compute(data);
             if (actualCrc != header.Crc)
             {
                 throw new InvalidDataException("Контрольная сумма CRC не совпадает: извлечённые данные повреждены");
